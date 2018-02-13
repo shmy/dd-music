@@ -1,0 +1,9 @@
+/build/
+/config/
+/dist/
+/src/plugins/aplayer/
+/src/plugins/music/
+/src/plugins/lodash.throttle.js
+/src/plugins/lodash.debounce.js
+/electron/
+/*.js

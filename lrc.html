@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <title>Document</title>
+  <style>
+    html,
+    body {
+      overflow: hidden;
+      font-family: 'Microsoft Yahei', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+    }
+
+    #lyric {
+      font-size: 40px;
+      font-weight: bold;
+      text-align: center;
+      color: #0af;
+      margin: 0;
+      padding: 0;
+      height: 100px;
+      line-height: 100px;
+    }
+  </style>
+</head>
+
+<body>
+  <p id="lyric"></p>
+  <script>
+    const { remote: { app } } = require('electron')
+    const { join, dirname, sep } = require('path')
+    const { readFileSync } = require('fs')
+    const appPath = dirname(app.getPath('exe'))
+    const cache = join(appPath, '../.cache/')
+
+    let lrcIndex = 0
+    let lrc = []
+    const parseLrc = lrc_s => {
+      if (!lrc_s) {
+        return [[0, '暂无歌词，请你欣赏']]
+      }
+      const lyric = lrc_s.split('\n')
+      const lrc = []
+      const lyricLen = lyric.length
+      for (let i = 0; i < lyricLen; i++) {
+        // match lrc time
+        const lrcTimes = lyric[i].match(/\[(\d{2}):(\d{2})\.(\d{2,3})]/g)
+        // match lrc text
+        const lrcText = lyric[i].replace(/\[(\d{2}):(\d{2})\.(\d{2,3})]/g, '').replace(/^\s+|\s+$/g, '')
+
+        if (lrcTimes && lrcText) {
+          // handle multiple time tag
+          const timeLen = lrcTimes.length
+          for (let j = 0; j < timeLen; j++) {
+            const oneTime = /\[(\d{2}):(\d{2})\.(\d{2,3})]/.exec(lrcTimes[j])
+            const lrcTime = oneTime[1] * 60 + parseInt(oneTime[2]) + parseInt(oneTime[3]) / ((oneTime[3] + '').length === 2 ? 100 : 1000)
+            lrc.push([lrcTime, lrcText])
+          }
+        }
+      }
+      // sort by time
+      lrc.sort((a, b) => a[0] - b[0])
+      return lrc
+    }
+
+    const updateLrc = currentTime => {
+      if (lrcIndex > lrc.length - 1 || currentTime < lrc[lrcIndex][0] || (!lrc[lrcIndex + 1] || currentTime >= lrc[lrcIndex + 1][0])) {
+        for (let i = 0; i < lrc.length; i++) {
+          if (currentTime >= lrc[i][0] && (!lrc[i + 1] || currentTime < lrc[i + 1][0])) {
+            lrcIndex = i
+            lyric.innerText = lrc[i][1]
+          }
+        }
+      }
+    }
+    const Events = {
+      timeupdate(data) {
+        updateLrc(data)
+      },
+      'set-lyric': data => {
+        lyric.innerText = '点点音乐，想听就听'
+        if (data) {
+          data = readFileSync(join(cache, data), { encoding: 'utf8' })
+          lrc = parseLrc(data)
+        } else {
+          lrc = ''
+        }
+      }
+    }
+    require('electron').ipcRenderer.on('ping', (event, data) => {
+      Events[data.type] ? Events[data.type](data.data) : void 0
+    })
+  </script>
+</body>
+
+</html>
